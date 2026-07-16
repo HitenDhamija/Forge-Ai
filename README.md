@@ -19,6 +19,7 @@
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green.svg)](https://fastapi.tiangolo.com/)
+[![MCP](https://img.shields.io/badge/MCP-Model%20Context%20Protocol-purple.svg)](https://modelcontextprotocol.io/)
 
 </div>
 
@@ -57,6 +58,7 @@ ForgeAI is an **autonomous AI operations platform** that orchestrates a team of 
 | **Ollama** | Local LLM inference (qwen2.5) |
 | **Tree-sitter** | AST parsing for code understanding |
 | **ChromaDB** | Vector database for semantic memory |
+| **MCP** | Model Context Protocol for tool virtualization |
 | **Docker** | Containerization |
 
 ### Frontend
@@ -89,6 +91,15 @@ ForgeAI is an **autonomous AI operations platform** that orchestrates a team of 
 │  │   React     │    │   SQLite    │    │   Vector    │             │
 │  │   Stores    │    │   Database  │    │   Memory    │             │
 │  └─────────────┘    └─────────────┘    └─────────────┘             │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                    MCP TOOL VIRTUALIZATION LAYER                    │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐│
+│  │   Git    │ │Filesystem│ │ Terminal │ │ Browser  │ │ Database ││
+│  │   MCP    │ │   MCP    │ │   MCP    │ │   MCP    │ │   MCP    ││
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘│
 │                                                                     │
 ├─────────────────────────────────────────────────────────────────────┤
 │                        AI AGENT TEAM                                │
@@ -128,7 +139,65 @@ ForgeAI is an **autonomous AI operations platform** that orchestrates a team of 
 | **Monitoring** | Real-time system health dashboard |
 | **Studio** | Visual workflow builder and prompt management |
 | **Validation** | Release candidate checks before shipping |
-| **Tools** | Execute filesystem, git, and terminal operations |
+| **MCP Tools** | Standardized tool layer via Model Context Protocol (Git, Filesystem, Terminal, Browser, Database, Docker) |
+
+---
+
+## MCP — Model Context Protocol
+
+ForgeAI uses **MCP (Model Context Protocol)** as a standardized tool virtualization layer. MCP provides a unified interface for AI agents to interact with external systems safely and consistently.
+
+### What is MCP?
+
+MCP is an open protocol that standardizes how AI applications connect to external tools and data sources. Think of it as a **universal adapter** that lets AI agents use any tool through a consistent interface.
+
+### MCP Tools in ForgeAI
+
+| Tool | Purpose | What It Does |
+|------|---------|--------------|
+| **Git MCP** | Version control | Clone repos, create branches, commit, push, diff, log |
+| **Filesystem MCP** | File operations | Read, write, delete, list, search files and directories |
+| **Terminal MCP** | Shell execution | Run commands with sandboxing and output capture |
+| **Browser MCP** | Web operations | Navigate pages, extract content, fill forms |
+| **Database MCP** | Data operations | Query, insert, update, schema management |
+| **Docker MCP** | Container ops | Build, run, stop containers; manage compose stacks |
+
+### How MCP Works in ForgeAI
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                     AI AGENT REQUEST                          │
+│  "Read the authentication module and fix the bug"            │
+└──────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌──────────────────────────────────────────────────────────────┐
+│                    MCP ADAPTER LAYER                          │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │   Git MCP   │  │FileSystem  │  │  Terminal   │         │
+│  │   Adapter   │  │   MCP       │  │   MCP       │         │
+│  └─────────────┘  └─────────────┘  └─────────────┘         │
+└──────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌──────────────────────────────────────────────────────────────┐
+│                   SANDBOXED EXECUTION                         │
+│  • Permissions checked                                        │
+│  • Commands validated                                         │
+│  • Output captured                                            │
+│  • Rollback on failure                                        │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Benefits of MCP
+
+| Benefit | Description |
+|---------|-------------|
+| **Standardization** | All tools follow the same interface pattern |
+| **Safety** | Sandboxed execution with permission checks |
+| **Extensibility** | Easy to add new MCP tools |
+| **Interoperability** | Works with any MCP-compatible AI model |
+| **Auditability** | All tool calls are logged and traceable |
 
 ---
 
@@ -324,7 +393,14 @@ forge-ai/
 │   │   ├── plugins/           # Plugin system
 │   │   ├── repo_intelligence/ # Repository analysis
 │   │   ├── studio/            # Visual workflow builder
-│   │   ├── tools/             # Filesystem, git, terminal tools
+│   │   ├── tools/             # MCP tool virtualization layer
+│   │   │   ├── mcp.py         # MCP server adapter & runtime
+│   │   │   ├── filesystem.py  # Filesystem MCP tool
+│   │   │   ├── git.py         # Git MCP tool
+│   │   │   ├── terminal.py    # Terminal MCP tool
+│   │   │   ├── browser.py     # Browser MCP tool
+│   │   │   ├── database.py    # Database MCP tool
+│   │   │   └── docker.py      # Docker MCP tool
 │   │   └── validation/        # Release validation
 │   ├── alembic/               # Database migrations
 │   └── tests/                 # Backend tests
