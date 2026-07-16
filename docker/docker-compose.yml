@@ -1,0 +1,174 @@
+version: "3.9"
+
+services:
+  # ============================================================
+  # Backend Service (FastAPI / Python)
+  # ============================================================
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: forgeai-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - APP_ENV=${APP_ENV:-production}
+      - DEBUG=${DEBUG:-false}
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - AI_DEFAULT_MODEL=${AI_DEFAULT_MODEL:-qwen2.5}
+      - AI_MAX_CONTEXT_LENGTH=${AI_MAX_CONTEXT_LENGTH:-4096}
+      - AI_MAX_RESPONSE_TOKENS=${AI_MAX_RESPONSE_TOKENS:-2048}
+      - AI_TEMPERATURE=${AI_TEMPERATURE:-0.7}
+      - MEMORY_CHROMA_HOST=chromadb
+      - MEMORY_CHROMA_PORT=8000
+      - MEMORY_EMBEDDING_MODEL=${MEMORY_EMBEDDING_MODEL:-BAAI/bge-small-en-v1.5}
+      - MEMORY_EMBEDDING_FALLBACK_MODEL=${MEMORY_EMBEDDING_FALLBACK_MODEL:-all-MiniLM-L6-v2}
+      - MEMORY_SEARCH_TOP_K=${MEMORY_SEARCH_TOP_K:-20}
+      - MEMORY_CONTEXT_MAX_TOKENS=${MEMORY_CONTEXT_MAX_TOKENS:-4096}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    networks:
+      - forge-network
+    volumes:
+      - app-logs:/app/logs
+      - repo_data:/tmp/forgeai/repos
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+
+  # ============================================================
+  # Frontend Service (Next.js / Node.js)
+  # ============================================================
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+      target: runner
+    container_name: forgeai-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+      - NODE_ENV=production
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - forge-network
+
+  # ============================================================
+  # Ollama LLM Server (Local AI Inference)
+  # ============================================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: forgeai-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - forge-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  # ============================================================
+  # ChromaDB (Vector Database for Semantic Memory)
+  # ============================================================
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: forgeai-chromadb
+    restart: unless-stopped
+    ports:
+      - "8100:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - ANONYMIZED_TELEMETRY=False
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+    networks:
+      - forge-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+  # ============================================================
+  # PostgreSQL Database
+  # ============================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: forgeai-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-forgeai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-forgeai_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-forgeai}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - forge-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-forgeai} -d ${POSTGRES_DB:-forgeai}"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+
+# ============================================================
+# Networks
+# ============================================================
+networks:
+  forge-network:
+    driver: bridge
+    name: forge-network
+
+# ============================================================
+# Volumes
+# ============================================================
+volumes:
+  postgres_data:
+    driver: local
+    name: forgeai-postgres-data
+  app-logs:
+    driver: local
+    name: forgeai-app-logs
+  ollama_data:
+    driver: local
+    name: forgeai-ollama-data
+  repo_data:
+    driver: local
+    name: forgeai-repo-data
+  chroma_data:
+    driver: local
+    name: forgeai-chroma-data
