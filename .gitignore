@@ -177,3 +177,4 @@ next-output.log
 temp_page.html
 backend/check_db.py
 backend/test_api.py
+docs/generated/
